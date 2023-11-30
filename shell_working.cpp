@@ -29,9 +29,14 @@ public:
                 break;
             }
 
-            parseAndExecuteCommand(input);
+            if (input.find(".sh") != string::npos) {
+                executeShellScript(input);
+            } else {
+                parseAndExecuteCommand(input);
+            }
         }
     }
+
 
 public:
 
@@ -530,6 +535,13 @@ void copyFile(const vector<string>& tokens, const string&) {
             
     //     }
     // }
+
+    void executeShellScript(const string& scriptFileName) {
+        string command = "bash " + scriptFileName;
+        string output = executeCommand(command.c_str());
+        //cout << "Shell script output:\n" << output << endl;
+    }
+
 };
 
 int main() {

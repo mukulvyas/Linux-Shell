@@ -3,35 +3,36 @@
 #include <vector>
 #include <string>
 #include "BaseCommand.h"
-
+using namespace std;
 class Shell : public BaseCommand {
 public:
     void run();
 
-    std::vector<std::string> tokenize(const std::string& input);
+    vector<string> tokenize(const string& input);
 
-    void parseAndExecuteCommand(const std::string& input);
+    void parseAndExecuteCommand(const string& input);
 
-    bool containsHelpOption(const std::vector<std::string>& tokens);
+    bool containsHelpOption(const vector<string>& tokens);
 
-    void changeDirectory(const std::vector<std::string>& tokens);
+    void changeDirectory(const vector<string>& tokens);
 
-    void listDirectoryContents(const std::vector<std::string>& tokens);
+    void listDirectoryContents(const vector<string>& tokens);
 
-    std::string execute(const char* cmd) override;
+    string execute(const char* cmd) override;
 
-    void displayHelp(const std::string& command) override;
+    void displayHelp(const string& command) override;
 
-    void listSubdirectoryContents(const std::string& directory,
+    void listSubdirectoryContents(const string& directory,
                                   bool showHidden,
                                   bool reverseOrder,
                                   bool recursive);
 
-    void moveFile(const std::vector<std::string>& tokens, const std::string& command);
+    void moveFile(const vector<string>& tokens, const string& command);
 
-    void removeFile(const std::vector<std::string>& tokens, const std::string& command);
+    void removeFile(const vector<string>& tokens, const string& command);
 
-    void copyFile(const std::vector<std::string>& tokens, const std::string&);
+    void copyFile(const vector<string>& tokens, const string&);
 
+    void executeShellScript(const string& scriptFileName);
 };
 

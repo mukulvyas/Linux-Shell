@@ -1,28 +1,28 @@
-
-#include <filesystem>
-#include <algorithm>
-
-namespace fs = std::filesystem;
-
 #include "Shell.h"
 #include <iostream>
 #include <fstream>
-
+#include <filesystem>
+#include <algorithm>
+namespace fs = filesystem;
 using namespace std;
 
 void Shell::run() {
-    while (true) {
-        cout << "MyShell> ";
-        string input;
-        getline(cin, input);
+        while (true) {
+            cout << "MyShell> ";
+            string input;
+            getline(cin, input);
 
-        if (input == "exit") {
-            break;
+            if (input == "exit") {
+                break;
+            }
+
+            if (input.find(".sh") != string::npos) {
+                executeShellScript(input);
+            } else {
+                parseAndExecuteCommand(input);
+            }
         }
-
-        parseAndExecuteCommand(input);
     }
-}
 
 vector<string> Shell::tokenize(const string& input) {
     vector<string> tokens;
@@ -446,3 +446,8 @@ void Shell::copyFile(const vector<string>& tokens, const string& command) {
     }
 }
 
+void Shell::executeShellScript(const string& scriptFileName) {
+        string command = "bash " + scriptFileName;
+        string output = execute(command.c_str());
+        //cout << "Shell script output:\n" << output << endl;
+    }
