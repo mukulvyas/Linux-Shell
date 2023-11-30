@@ -149,6 +149,8 @@ void Shell::listDirectoryContents(const vector<string>& tokens) {
     bool reverseOrder = false;
     bool recursive = false;
 
+    vector<string> patterns;
+
     for (size_t i = 1; i < tokens.size(); ++i) {
         if (tokens[i] == "-a" || tokens[i] == "--all") {
             showHidden = true;
@@ -161,6 +163,9 @@ void Shell::listDirectoryContents(const vector<string>& tokens) {
         } else if (tokens[i] == "--help") {
             displayHelp("ls");
             return;
+        } else if (tokens[i].find('*') != string::npos || tokens[i].find('?') != string::npos) {
+            // Wildcard detected, add to patterns
+            patterns.push_back(tokens[i]);
         } else {
             cout << "Unknown option: " << tokens[i] << endl;
             return;
@@ -175,7 +180,17 @@ void Shell::listDirectoryContents(const vector<string>& tokens) {
             continue; // Skip hidden files
         }
 
-        fileNames.push_back(itr->path().filename().string());
+        bool matchesPattern = true;
+        for (const auto& pattern : patterns) {
+            if (!fs::path(itr->path().filename().string()).filename().compare(pattern)) {
+                matchesPattern = false;
+                break;
+            }
+        }
+
+        if (matchesPattern) {
+            fileNames.push_back(itr->path().filename().string());
+        }
     }
 
     if (reverseOrder) {
@@ -203,6 +218,7 @@ void Shell::listDirectoryContents(const vector<string>& tokens) {
     }
 
     cout << endl;
+
     
 }
 
@@ -313,8 +329,8 @@ void Shell::moveFile(const vector<string>& tokens, const string& command) {
 
             //mvCommand += " -i";
         } else {
-            cerr << "Unknown option: " << option << endl;
-            return;
+            result = system(command.c_str());
+            
         }
     }
 
@@ -333,48 +349,50 @@ void Shell::removeFile(const vector<string>& tokens, const string& command) {
     bool forceRemove = false;
     bool recursiveRemove = false;
     bool removeEmptyDirs = false;
-    int result=0;
-    for (size_t i = 1; i < tokens.size(); ++i) {
-        //cout<<tokens[i];
-        if (tokens[i] == "-f" || tokens[i] == "--force") {
+    int result = 0;
 
+    for (size_t i = 1; i < tokens.size(); ++i) {
+        if (tokens[i] == "-f" || tokens[i] == "--force") {
             forceRemove = true;
-            
-            break;
         } else if (tokens[i] == "-r" || tokens[i] == "-R" || tokens[i] == "--recursive") {
             recursiveRemove = true;
-            //result = system(command.c_str());
-            break;
         } else if (tokens[i] == "-d" || tokens[i] == "--dir") {
             removeEmptyDirs = true;
-            //result = system(command.c_str());
-            break;
         } else if (tokens[i] == "--help") {
             displayHelp("rm");
             return;
-        } 
+        }
+        else{
+            result = system(command.c_str());
+        }
     }
 
     if (tokens.size() > 1) {
         try {
+            fs::path pathToRemove(tokens.back());  // Assuming the file or directory path is the last token
+
             if (forceRemove) {
                 if (recursiveRemove) {
-                    result = system(command.c_str());
+                    for (const auto& entry : fs::recursive_directory_iterator(pathToRemove)) {
+                        fs::remove_all(entry.path());
+                    }
                 } else {
                     if (removeEmptyDirs) {
-                        result = system(command.c_str());
+                        fs::remove(pathToRemove);
                     } else {
-                        result = system(command.c_str());
+                        fs::remove(pathToRemove);
                     }
                 }
             } else {
                 if (recursiveRemove) {
-                    result = system(command.c_str());
+                    for (const auto& entry : fs::recursive_directory_iterator(pathToRemove)) {
+                        fs::remove(entry.path());
+                    }
                 } else {
                     if (removeEmptyDirs) {
-                        result = system(command.c_str());
+                        fs::remove(pathToRemove);
                     } else {
-                        result = system(command.c_str());
+                        fs::remove(pathToRemove);
                     }
                 }
             }
@@ -383,14 +401,16 @@ void Shell::removeFile(const vector<string>& tokens, const string& command) {
             // Handle the error as needed
         }
     } else {
-        cout<<"Please try with proper command!!"<<endl;
+        cout << "Please try with a proper command!!" << endl;
+        return;
     }
 
     if (result == 0) {
         cout << "Command executed successfully." << endl;
     } else {
-        cerr << "Error executing command. Exit code: " << endl;
+        cerr << "Error executing command. Exit code: " << result << endl;
     }
+
 }
 
 void Shell::copyFile(const vector<string>& tokens, const string& command) {
@@ -408,6 +428,10 @@ void Shell::copyFile(const vector<string>& tokens, const string& command) {
             updateOnly = true;
         } else if (tokens[i] == "--help") {
             displayHelp("cp");
+            return;
+        }
+        else{
+            result = system(command.c_str());
             return;
         }
     }

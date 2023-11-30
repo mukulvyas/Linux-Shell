@@ -15,7 +15,7 @@ public:
     bool containsHelpOption(const vector<string>& tokens);
 
     void changeDirectory(const vector<string>& tokens);
-
+    //void listDirectoryContents(const vector<string>& tokens, const string& command);
     void listDirectoryContents(const vector<string>& tokens);
 
     string execute(const char* cmd) override;
