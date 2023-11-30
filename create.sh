@@ -1,65 +1,54 @@
 #!/bin/bash
 
 # Function to create directory with files of specified size and count
-create_directory() {
-  local size=$1
-  local count=$2
-  local dirname=$3
+generate_files() {
+  local file_size=$1
+  local file_count=$2
+  local directory_name=$3
 
-  mkdir -p "${dirname}" &&
-  cd "${dirname}" &&
-  for i in $(seq 1 "${count}"); do
-    dd if=/dev/zero of=file_${i}.dat bs="${size}" count=1 status=none
+  mkdir -p "${directory_name}" &&
+  cd "${directory_name}" &&
+  for index in $(seq 1 "${file_count}"); do
+    dd if=/dev/zero of=file_${index}.dat bs="${file_size}" count=1 status=none
   done
 }
 
-execute_case() {
-  local size=$1
-  local count=$2
-  local dirname=$3
-
-  create_directory "${size}" "${count}" "${dirname}"
-}
-
 while true; do
-  read -p "Choose a case to execute:
-1. 100 files of 1GB each
-2. 10,000 files of 10MB each
-3. 10MB files, 100 files directly, and recursively create subdirectories (total 10,000 files)
-Enter your choice (1/2/3): " choice
+  read -p "Choose:
+1. Generate 100 files, each 1GB in size
+2. Generate 10,000 files, each 10MB in size
+3. Generate 10MB files, 100 files directly, and recursively create subdirectories (total 10,000 files)
+Enter The Choice : " user_choice
 
-  case ${choice} in
+  case ${user_choice} in
     1)
-      echo "Executing Case 1..."
-      time (execute_case "1M" 10 "dir_1gb") &
+      echo "Option 1..."
+      time (generate_files "1G" 100 "1st_direct")
       ;;
     2)
-      echo "Executing Case 2..."
-      time (execute_case "10M" 10 "dir_10mb") &
+      echo "Option 2..."
+      time (generate_files "10M" 10000 "2nd_direct")
       ;;
     3)
-	  echo "Executing Case 3..."
-	  time (
-	    execute_case "10M" 10 "dir_recursive" &  # Create initial directory with 10 files
-	    wait  # Wait for background process to finish
-	    for i in $(seq 1 10); do
-	      execute_case "10M" 10 "subdir_${i}" &  # Create 10 subdirectories, each with 10 files
-	    done
-	    wait  # Wait for all background processes to finish
-	  )
-	  ;;
-
+      echo "Option 3..."
+      time (
+        generate_files "10M" 100 "3rd_recursive" &&
+        for subdir_index in $(seq 1 99); do
+          generate_files "10M" 100 "subdir_${subdir_index}"
+        done
+      )
+      ;;
     *)
       echo "Invalid choice. Exiting."
       exit 1
       ;;
   esac
 
-  read -p "Do you want to run another case? (y/n): " run_again
+  read -p "run another option? (y/n): " run_again
   if [[ "${run_again}" != "y" ]]; then
     echo "Exiting."
     break
   fi
 done
 
-echo "All directories and files created successfully."
+echo "All done"
