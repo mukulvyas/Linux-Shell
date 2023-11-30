@@ -3,9 +3,136 @@
 #include <string>
 #include <filesystem>
 #include <algorithm> 
+#include <sstream>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+#include <cstring>
+#include <memory>
+#include <thread>
+#include <mutex>
 using namespace std;
 namespace fs = filesystem;
 
+class Command_first
+{
+public:
+    virtual void execute() = 0;
+    virtual ~Command_first() {}
+};
+
+class Exit : public Command_first
+{
+public:
+    void execute() override
+    {
+        exit(0);
+    }
+};
+
+class Cd : public Command_first
+{
+private:
+    char cwd[256];
+
+public:
+    Cd(const vector<string> &args)
+    {
+        if (chdir(args[1].c_str()) != 0)
+        {
+            perror("chdir");
+        }
+        else
+        {
+            getcwd(cwd, sizeof(cwd)); // Update the current working directory
+        }
+    }
+
+    void execute() override {}
+};
+
+class ProcessExecutor : public Command_first
+{
+private:
+    vector<string> args;
+
+public:
+    ProcessExecutor(const vector<string> &args) : args(args) {}
+
+    void execute() override
+    {
+        pid_t pid, wait_pid;
+        int status;
+
+        pid = fork();
+
+        if (pid < 0)
+        {
+            cerr << "Fork failed." << endl;
+        }
+        else if (pid == 0)
+        {
+            // Child process
+            char **argv = new char *[args.size() + 1];
+            for (size_t i = 0; i < args.size(); ++i)
+            {
+                argv[i] = const_cast<char *>(args[i].c_str());
+            }
+            argv[args.size()] = nullptr;
+
+            if (execvp(argv[0], argv) == -1)
+            {
+                cerr << "Command not found: " << argv[0] << endl;
+                delete[] argv;
+                exit(EXIT_FAILURE);
+            }
+        }
+        else
+        {
+            // Parent process
+            do
+            {
+                wait_pid = waitpid(pid, &status, WUNTRACED);
+            } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+
+            // Print something to indicate successful execution along with thread ID
+            cout << "Command executed successfully using multiple threads! Thread ID: " << this_thread::get_id() << endl;
+        }
+    }
+};
+
+class Thread
+{
+private:
+    vector<thread> threads;
+    mutex mtx;
+
+public:
+    // Default constructor
+    Thread() {}
+
+    Thread(int numThreads) : threads(numThreads)
+    {
+    }
+
+    // Delete the move assignment operator
+    Thread &operator=(Thread &&) = delete;
+
+    void executeInParallel(unique_ptr<Command_first> command)
+    {
+        lock_guard<mutex> lock(mtx);
+
+        for (auto &thread : threads)
+        {
+            thread = std::thread(&Command_first::execute, command.get());
+        }
+
+        for (auto &thread : threads)
+        {
+            thread.join();
+        }
+    }
+};
 
 class BaseCommand {
 public:
@@ -16,8 +143,54 @@ public:
 
 class Shell: public BaseCommand {
 public:
+        char cwd[256]; // Buffer to store the current working directory
+        Thread threadPool;
 
-    
+    unique_ptr<Command_first> createCommand(const vector<string> &args)
+    {
+        const char *command = args[0].c_str();
+
+        if (args.size() == 1 && strcmp(command, "exit") == 0)
+        {
+            return make_unique<Exit>();
+        }
+
+        if (args.size() == 2 && strcmp(command, "cd") == 0)
+        {
+            return make_unique<Cd>(args);
+        }
+
+        return make_unique<ProcessExecutor>(args);
+    }
+
+    int calculateOptimalThreads(int availableCores, int workload)
+    {
+        // Adjust the number of threads based on workload and available cores
+        // This is a simplified example, you may need more sophisticated logic
+        int optimalThreads = min(availableCores, workload);
+        return optimalThreads > 0 ? optimalThreads : 1; // Ensure at least one thread
+    }
+
+    Shell()
+    {
+        // Get the number of available CPU cores
+        int numCores = thread::hardware_concurrency();
+        if (numCores == 0)
+        {
+            cerr << "Unable to determine the number of CPU cores. Defaulting to 1 thread." << endl;
+            numCores = 1;
+        }
+
+        // Calculate the initial number of threads based on available cores
+        int initialThreads = calculateOptimalThreads(numCores, 1);
+
+        // Use emplace_back to construct a new ThreadPool object without move assignment
+        threadPool.~Thread();
+        new (&threadPool) Thread(initialThreads);
+
+        // Initialize the current working directory
+        getcwd(cwd, sizeof(cwd));
+    }
 
     void run() {
         while (true) {
@@ -25,16 +198,30 @@ public:
             string input;
             getline(cin, input);
 
-            if (input == "exit") {
-                break;
+            vector<string> args = tokenize(input);
+
+            if (args.empty())
+            {
+                continue; // Empty command, prompt again
             }
 
-            parseAndExecuteCommand(input);
+            // Create and execute the command in parallel
+            unique_ptr<Command_first> command = createCommand(args);
+
+            // Adjust the number of threads based on workload and available cores
+            int optimalThreads = calculateOptimalThreads(thread::hardware_concurrency(), args.size());
+            threadPool.~Thread();
+            new (&threadPool) Thread(optimalThreads);
+
+            // Execute the command in parallel with the adjusted number of threads
+            threadPool.executeInParallel(move(command));
         }
     }
 
 public:
 
+
+    
     vector<string> tokenize(const string& input) {
         vector<string> tokens;
         size_t pos = 0;
@@ -49,6 +236,8 @@ public:
         tokens.push_back(input.substr(pos));
         return tokens;
     }
+
+    
 
     void parseAndExecuteCommand(const string& input) {
     vector<string> tokens = tokenize(input);
@@ -479,57 +668,7 @@ void copyFile(const vector<string>& tokens, const string&) {
 
     return result;
 }
-
-    // void displayHelp(const string& command) {
-    //     //cout << "Usage: ";
-
-    //    if (command == "cd") {
-    //     cout << "cd: cd [-L|[-P [-e]] [-@]] [dir]\n";
-    //     cout << "    Change the shell working directory.\n\n";
-    //     cout << "    Change the current directory to DIR.  The default DIR is the value of the\n";
-    //     cout << "    HOME shell variable.\n\n";
-    //     cout << "    The variable CDPATH defines the search path for the directory containing\n";
-    //     cout << "    DIR.  Alternative directory names in CDPATH are separated by a colon (:).\n";
-    //     cout << "    A null directory name is the same as the current directory.  If DIR begins\n";
-    //     cout << "    with a slash (/), then CDPATH is not used.\n\n";
-    //     cout << "    If the directory is not found, and the shell option `cdable_vars' is set,\n";
-    //     cout << "    the word is assumed to be a variable name.  If that variable has a value,\n";
-    //     cout << "    its value is used for DIR.\n\n";
-    //     cout << "    Options:\n";
-    //     cout << "      -L    force symbolic links to be followed: resolve symbolic\n";
-    //     cout << "            links in DIR after processing instances of `..'\n";
-    //     cout << "      -P    use the physical directory structure without following\n";
-    //     cout << "            symbolic links: resolve symbolic links in DIR before\n";
-    //     cout << "            processing instances of `..'\n";
-    //     cout << "      -e    if the -P option is supplied, and the current working\n";
-    //     cout << "            directory cannot be determined successfully, exit with\n";
-    //     cout << "            a non-zero status\n";
-    //     cout << "      -@   on systems that support it, present a file with extended\n";
-    //     cout << "            attributes as a directory containing the file attributes\n\n";
-    //     cout << "    The default is to follow symbolic links, as if `-L' were specified.\n";
-    //     cout << "    `..' is processed by removing the immediately previous pathname component\n";
-    //     cout << "    back to a slash or the beginning of DIR.\n\n";
-    //     cout << "    Exit Status:\n";
-    //     cout << "    Returns 0 if the directory is changed, and if $PWD is set successfully when\n";
-    //     cout << "    -P is used; non-zero otherwise.\n";      
-            
-    //     } else if (command == "ls") {
-    //         string output = executeCommand("ls --help");
-    //         cout << "\nOutput:\n" << output << endl;
-    //     } else if (command == "mv") {
-    //         string output = executeCommand("mv --help");
-    //         cout << "\nOutput:\n" << output << endl;
-            
-    //     } else if (command == "rm") {
-    //         string output = executeCommand("rm --help");
-    //         cout << "\nOutput:\n" << output << endl;
-            
-    //     } else if (command == "cp") {
-    //         string output = executeCommand("cp --help");
-    //         cout << "\nOutput:\n" << output << endl;
-            
-    //     }
-    // }
+    
 };
 
 int main() {

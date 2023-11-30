@@ -116,8 +116,8 @@ void Shell::changeDirectory(const vector<string>& tokens) {
                 usePhysicalStructure = true;
             } else if (tokens[i] == "-e") {
                 // Handle -e option if needed
-            } else {
-                cerr << "Unknown option: " << tokens[i] << endl;
+            } else if (tokens[i] == "*") {
+                
                 return;
             }
         }
