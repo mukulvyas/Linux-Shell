@@ -118,13 +118,13 @@ public:
     // Delete the move assignment operator
     Thread &operator=(Thread &&) = delete;
 
-    void executeInParallel(unique_ptr<Command_first> command)
+    void executeInParallel(shared_ptr<Command_first> command)
     {
         lock_guard<mutex> lock(mtx);
 
         for (auto &thread : threads)
         {
-            thread = std::thread(&Command_first::execute, command.get());
+            thread = std::thread(&Command_first::execute, command);
         }
 
         for (auto &thread : threads)
@@ -134,17 +134,18 @@ public:
     }
 };
 
-class BaseCommand {
+class BaseCommand
+{
 public:
-  virtual string execute(const char* cmd) = 0;
-  virtual void displayHelp(const string& command) = 0;
+    virtual string execute(const char *cmd) = 0;
+    virtual void displayHelp(const string &command) = 0;
 };
 
-
-class Shell: public BaseCommand {
+class Shell : public BaseCommand
+{
 public:
-        char cwd[256]; // Buffer to store the current working directory
-        Thread threadPool;
+    char cwd[256]; // Buffer to store the current working directory
+    Thread threadPool;
 
     unique_ptr<Command_first> createCommand(const vector<string> &args)
     {
@@ -192,14 +193,16 @@ public:
         getcwd(cwd, sizeof(cwd));
     }
 
-    void run() {
-        while (true) {
+    void run()
+    {   
+        while (true)
+        {
             cout << "MyShell> ";
             string input;
             getline(cin, input);
 
             vector<string> args = tokenize(input);
-
+            
             if (args.empty())
             {
                 continue; // Empty command, prompt again
@@ -208,32 +211,24 @@ public:
             // Create and execute the command in parallel
             unique_ptr<Command_first> command = createCommand(args);
 
-            // Adjust the number of threads based on workload and available cores
-            int optimalThreads = calculateOptimalThreads(thread::hardware_concurrency(), args.size());
-            threadPool.~Thread();
-            new (&threadPool) Thread(optimalThreads);
-
-            // Execute the command in parallel with the adjusted number of threads
-            threadPool.executeInParallel(move(command));
+            // Check if the command is not nullptr before proceeding
+            if (command)
+            {
+                shared_ptr<Command_first> sharedCommand = std::move(command);
+                threadPool.executeInParallel(sharedCommand);
+            }
         }
     }
 
-public:
-
-
-    
-    vector<string> tokenize(const string& input) {
+    vector<string> tokenize(const string &input)
+    {
         vector<string> tokens;
-        size_t pos = 0;
-        size_t found = input.find(' ');
-
-        while (found != string::npos) {
-            tokens.push_back(input.substr(pos, found - pos));
-            pos = found + 1;
-            found = input.find(' ', pos);
+        istringstream iss(input);
+        string token;
+        while (iss >> token)
+        {
+            tokens.push_back(token);
         }
-
-        tokens.push_back(input.substr(pos));
         return tokens;
     }
 

@@ -59,7 +59,7 @@ public:
         lock_guard<mutex> lock(mtx);
 
         for (auto& thread : threads) {
-            thread = thread(func);
+            thread = std::thread(func);
         }
 
         for (auto& thread : threads) {

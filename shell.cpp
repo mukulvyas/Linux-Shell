@@ -6,37 +6,42 @@
 namespace fs = filesystem;
 using namespace std;
 
+
 void Shell::run() {
-        while (true) {
+               while (true)
+        {
             cout << "MyShell> ";
             string input;
             getline(cin, input);
 
-            if (input == "exit") {
-                break;
+            vector<string> args = tokenize(input);
+            
+            if (args.empty())
+            {
+                continue; // Empty command, prompt again
             }
 
-            if (input.find(".sh") != string::npos) {
-                executeShellScript(input);
-            } else {
-                parseAndExecuteCommand(input);
+            // Create and execute the command in parallel
+            unique_ptr<Command_first> command = createCommand(args);
+
+            // Check if the command is not nullptr before proceeding
+            if (command)
+            {
+                shared_ptr<Command_first> sharedCommand = std::move(command);
+                threadPool.executeInParallel(sharedCommand);
             }
         }
     }
 
 vector<string> Shell::tokenize(const string& input) {
-    vector<string> tokens;
-    size_t pos = 0;
-    size_t found = input.find(' ');
-
-    while (found != string::npos) {
-        tokens.push_back(input.substr(pos, found - pos));
-        pos = found + 1;
-        found = input.find(' ', pos);
-    }
-
-    tokens.push_back(input.substr(pos));
-    return tokens;
+            vector<string> tokens;
+        istringstream iss(input);
+        string token;
+        while (iss >> token)
+        {
+            tokens.push_back(token);
+        }
+        return tokens;
 }
 
 
