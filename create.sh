@@ -13,6 +13,14 @@ create_directory() {
   done
 }
 
+execute_case() {
+  local size=$1
+  local count=$2
+  local dirname=$3
+
+  create_directory "${size}" "${count}" "${dirname}"
+}
+
 while true; do
   read -p "Choose a case to execute:
 1. 100 files of 1GB each
@@ -23,21 +31,24 @@ Enter your choice (1/2/3): " choice
   case ${choice} in
     1)
       echo "Executing Case 1..."
-      time (create_directory "1M" 10 "dir_1gb")
+      time (execute_case "1M" 10 "dir_1gb") &
       ;;
     2)
       echo "Executing Case 2..."
-      time (create_directory "10M" 10 "dir_10mb")
+      time (execute_case "10M" 10 "dir_10mb") &
       ;;
     3)
-      echo "Executing Case 3..."
-      time (
-        create_directory "10M" 10 "dir_recursive" &&
-        for i in $(seq 1 10); do
-          create_directory "10M" 10 "subdir_${i}"
-        done
-      )
-      ;;
+	  echo "Executing Case 3..."
+	  time (
+	    execute_case "10M" 10 "dir_recursive" &  # Create initial directory with 10 files
+	    wait  # Wait for background process to finish
+	    for i in $(seq 1 10); do
+	      execute_case "10M" 10 "subdir_${i}" &  # Create 10 subdirectories, each with 10 files
+	    done
+	    wait  # Wait for all background processes to finish
+	  )
+	  ;;
+
     *)
       echo "Invalid choice. Exiting."
       exit 1
@@ -52,4 +63,3 @@ Enter your choice (1/2/3): " choice
 done
 
 echo "All directories and files created successfully."
-
