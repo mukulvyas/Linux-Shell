@@ -9,8 +9,22 @@ generate_files() {
   mkdir -p "${directory_name}" &&
   cd "${directory_name}" &&
   for index in $(seq 1 "${file_count}"); do
-    dd if=/dev/zero of=file_${index}.dat bs="${file_size}" count=1 status=none
+    dd if=/dev/zero of=file_${index}.dat bs="${file_size}" count=1 status=none &
   done
+  wait
+}
+
+generate_recursive_structure() {
+  local base_directory=$1
+  local subdir_count=$2
+  local file_size=$3
+
+  generate_files "${file_size}" 1 "${base_directory}"
+
+  for subdir_index in $(seq 1 "${subdir_count}"); do
+    generate_files "${file_size}" 100 "${base_directory}/subdir_${subdir_index}" &
+  done
+  wait
 }
 
 while true; do
@@ -23,20 +37,18 @@ Enter The Choice : " user_choice
   case ${user_choice} in
     1)
       echo "Option 1..."
-      time (generate_files "1G" 100 "1st_direct")
+      time (generate_files "10MB" 100 "1st_direct")
       ;;
     2)
       echo "Option 2..."
-      time (generate_files "10M" 10000 "2nd_direct")
+      time (generate_files "5MB" 1000 "2nd_direct")
       ;;
     3)
       echo "Option 3..."
-      time (
-        generate_files "10M" 100 "3rd_recursive" &&
+      time ( generate_files "1M" 10 "3rd_recursive" &&
         for subdir_index in $(seq 1 99); do
-          generate_files "10M" 100 "subdir_${subdir_index}"
-        done
-      )
+          generate_files "1M" 10 "subdir_${subdir_index}"
+        done)
       ;;
     *)
       echo "Invalid choice. Exiting."
@@ -52,3 +64,4 @@ Enter The Choice : " user_choice
 done
 
 echo "All done"
+
