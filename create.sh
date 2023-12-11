@@ -23,18 +23,18 @@ Enter The Choice : " user_choice
   case ${user_choice} in
     1)
       echo "Option 1..."
-      time (generate_files "1G" 100 "1st_direct")
+      time (generate_files "10M" 10 "1st_direct")
       ;;
-    2)
+    2)successfully.
       echo "Option 2..."
-      time (generate_files "10M" 10000 "2nd_direct")
+      time (generate_files "10M" 100 "2nd_direct")
       ;;
     3)
       echo "Option 3..."
       time (
-        generate_files "10M" 100 "3rd_recursive" &&
+        generate_files "10M" 10 "3rd_recursive" &&
         for subdir_index in $(seq 1 99); do
-          generate_files "10M" 100 "subdir_${subdir_index}"
+          generate_files "10M" 10 "subdir_${subdir_index}"
         done
       )
       ;;
